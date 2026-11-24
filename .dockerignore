@@ -1,0 +1,31 @@
+# Dependencies
+node_modules
+.pnpm-store
+
+# Next.js build
+.next
+
+# Development
+*.md
+docs/
+prompts/
+.env
+.env.*
+!.env.example
+!.env.production.example
+scratch/
+.git
+.gitignore
+.vscode
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Test
+*.test.ts
+*.spec.ts
+__tests__
+
+# Dev-only security checks (see pnpm check:security)
+scripts/

@@ -1,0 +1,570 @@
+// CECS - Company Equipment Control System
+// Sumber kebenaran skema. Ubah di sini dulu, baru migrate.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============ ENUM ============
+
+enum Role {
+  ADMIN
+  SUPERVISOR
+  TECHNICIAN
+  OPERATOR
+  VIEWER
+}
+
+enum UsageStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum EquipmentCategory {
+  HEAVY_EQUIPMENT
+  VEHICLE
+  GENERATOR
+  COMPRESSOR
+  PUMP
+  WELDING_MACHINE
+  OTHER_POWERED_EQUIPMENT
+}
+
+enum EquipmentStatus {
+  READY
+  STANDBY
+  IN_USE
+  BREAKDOWN
+  UNDER_REPAIR
+  SCRAPPED
+}
+
+enum Ownership {
+  OWNED
+  RENTAL
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum BreakdownStatus {
+  SUBMITTED
+  CONVERTED
+  CANCELLED
+}
+
+enum WorkOrderType {
+  CORRECTIVE
+  PREVENTIVE
+  INSPECTION_FOLLOW_UP
+}
+
+enum WorkOrderStatus {
+  OPEN
+  WAITING_PART
+  IN_PROGRESS
+  DONE
+  CLOSED
+}
+
+enum PmBasis {
+  HOUR_METER
+  CALENDAR
+}
+
+enum PmStatus {
+  UPCOMING
+  DUE
+  OVERDUE
+}
+
+enum InspectionResult {
+  PASS
+  PASS_WITH_REMARK
+  FAIL
+}
+
+enum PartSystem {
+  ENGINE
+  HYDRAULIC
+  ELECTRICAL
+  UNDERCARRIAGE
+  TRANSMISSION
+  OTHERS
+}
+
+enum AttachmentEntity {
+  EQUIPMENT
+  BREAKDOWN
+  WORK_ORDER
+  INSPECTION
+}
+
+// ============ USER & MASTER ============
+
+model User {
+  id                 String      @id @default(cuid())
+  name               String
+  nik                String      @unique
+  email              String?     @unique
+  passwordHash       String
+  avatarUrl          String?
+  role               Role        @default(TECHNICIAN)
+  departmentId       String?
+  department         Department? @relation(fields: [departmentId], references: [id])
+  isActive           Boolean     @default(true)
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+  deletedAt          DateTime?
+  tokenInvalidBefore DateTime? // JWT issued before this time is rejected (force-logout)
+
+  hourMeterLogs      HourMeterLog[]
+  breakdownsCreated  BreakdownRequest[]      @relation("BreakdownReporter")
+  workOrdersAssigned WorkOrder[]             @relation("WorkOrderTechnician")
+  workOrdersClosed   WorkOrder[]             @relation("WorkOrderCloser")
+  inspections        Inspection[]
+  attachments        Attachment[]
+  auditLogs          AuditLog[]
+  usageSessions      EquipmentUsageSession[]
+
+  @@index([role, isActive])
+}
+
+model Department {
+  id        String      @id @default(cuid())
+  name      String      @unique
+  deletedAt DateTime?
+  users     User[]
+  equipment Equipment[]
+
+  @@index([deletedAt])
+}
+
+model Location {
+  id        String      @id @default(cuid())
+  name      String      @unique
+  deletedAt DateTime?
+  equipment Equipment[]
+
+  @@index([deletedAt])
+}
+
+model PmType {
+  id        String                @id @default(cuid())
+  name      String                @unique // contoh: 250 Hours Service, Annual Service
+  deletedAt DateTime?
+  templates PmChecklistTemplate[]
+  plans     PmPlan[]
+
+  @@index([deletedAt])
+}
+
+model InspectionType {
+  id          String       @id @default(cuid())
+  name        String       @unique // Safety, Load Test, Wire Rope, Annual, Third Party
+  deletedAt   DateTime?
+  inspections Inspection[]
+
+  @@index([deletedAt])
+}
+
+// ============ EQUIPMENT ============
+
+model Equipment {
+  id                String            @id @default(cuid())
+  code              String            @unique // CRN-001
+  assetNumber       String? // opsional, referensi silang audit aset
+  supplier          String? // teks referensi saja: tanpa relasi vendor, tanpa harga
+  category          EquipmentCategory
+  name              String
+  manufacturer      String?
+  model             String?
+  serialNumber      String?
+  yearOfManufacture Int?
+  inServiceDate     DateTime?
+
+  engineModel        String?
+  engineSerialNumber String?
+  transmission       String?
+  capacity           String?
+  operatingWeight    String?
+  fuelType           String?
+
+  // Engine & performance specs, free text because units vary per manufacturer
+  engineManufacturer String?
+  enginePower        String?
+  maxTorque          String?
+  cylinderCount      String? // e.g. "6 silinder"
+  engineDisplacement String?
+  hydraulicSystem    String?
+  maxTravelSpeed     String?
+  gradeability       String?
+  turningRadius      String?
+  dimensions         String? // L x W x H
+
+  // Fluid capacities in liters
+  engineOilCapacity       Float?
+  transmissionOilCapacity Float?
+  hydraulicOilCapacity    Float?
+  fuelTankCapacity        Float?
+
+  // Free-form technical notes, e.g. wire rope and lubrication specs
+  notes String? @db.Text
+
+  locationId       String?
+  location         Location?       @relation(fields: [locationId], references: [id])
+  departmentId     String?
+  department       Department?     @relation(fields: [departmentId], references: [id])
+  ownership        Ownership       @default(OWNED)
+  status           EquipmentStatus @default(READY)
+  currentHourMeter Int             @default(0)
+  photoUrl         String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  hourMeterLogs HourMeterLog[]
+  breakdowns    BreakdownRequest[]
+  workOrders    WorkOrder[]
+  pmPlans       PmPlan[]
+  inspections   Inspection[]
+  usageSessions EquipmentUsageSession[]
+
+  @@index([category, status])
+  @@index([deletedAt])
+}
+
+model HourMeterLog {
+  id          String    @id @default(cuid())
+  equipmentId String
+  equipment   Equipment @relation(fields: [equipmentId], references: [id])
+  readingDate DateTime
+  hourMeter   Int
+  source      String    @default("MANUAL") // MANUAL | BREAKDOWN | WORK_ORDER | PM | INSPECTION
+  remark      String?
+  createdById String
+  createdBy   User      @relation(fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now())
+  deletedAt   DateTime?
+
+  @@index([equipmentId, readingDate])
+  @@index([deletedAt])
+}
+
+// ============ OPERATOR USAGE SESSION ============
+
+model EquipmentUsageSession {
+  id              String      @id @default(cuid())
+  equipmentId     String
+  equipment       Equipment   @relation(fields: [equipmentId], references: [id])
+  operatorId      String
+  operator        User        @relation(fields: [operatorId], references: [id])
+  startAt         DateTime    @default(now())
+  endAt           DateTime?
+  startPhotoUrl   String // Foto meteran dashboard saat mulai pakai
+  endPhotoUrl     String? // Foto meteran dashboard saat selesai pakai
+  durationMinutes Int? // Dihitung otomatis saat selesai
+  remarks         String? // Catatan pekerjaan operator (opsional)
+  status          UsageStatus @default(ACTIVE)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  deletedAt       DateTime?
+
+  @@index([equipmentId, status])
+  @@index([operatorId, status])
+  @@index([deletedAt])
+}
+
+// ============ BREAKDOWN & WORK ORDER ============
+
+model BreakdownRequest {
+  id           String          @id @default(cuid())
+  code         String          @unique // BD-2026-000045
+  equipmentId  String
+  equipment    Equipment       @relation(fields: [equipmentId], references: [id])
+  reportedAt   DateTime        @default(now())
+  hourMeter    Int
+  reportedById String
+  reportedBy   User            @relation("BreakdownReporter", fields: [reportedById], references: [id])
+  problem      String
+  priority     Priority        @default(MEDIUM)
+  status       BreakdownStatus @default(SUBMITTED)
+
+  workOrder WorkOrder?
+  createdAt DateTime   @default(now())
+  deletedAt DateTime?
+
+  @@index([equipmentId, reportedAt])
+}
+
+model WorkOrder {
+  id                 String            @id @default(cuid())
+  code               String            @unique // WO-2026-000125
+  equipmentId        String
+  equipment          Equipment         @relation(fields: [equipmentId], references: [id])
+  breakdownRequestId String?           @unique
+  breakdownRequest   BreakdownRequest? @relation(fields: [breakdownRequestId], references: [id])
+  pmPlanId           String?
+  pmPlan             PmPlan?           @relation(fields: [pmPlanId], references: [id])
+
+  type              WorkOrderType
+  status            WorkOrderStatus @default(OPEN)
+  assignedToId      String?
+  assignedTo        User?           @relation("WorkOrderTechnician", fields: [assignedToId], references: [id])
+  externalServiceBy String? // teks bebas, bukan relasi vendor
+
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  closedAt        DateTime?
+  closedById      String?
+  closedBy        User?     @relation("WorkOrderCloser", fields: [closedById], references: [id])
+  downtimeMinutes Int? // dihitung otomatis saat CLOSED
+
+  diagnosis     Diagnosis?
+  repairResult  RepairResult?
+  pmExecution   PmExecution?
+  partUsages    PartUsage[]
+  statusHistory WorkOrderStatusHistory[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([equipmentId, status])
+  @@index([status, createdAt])
+}
+
+model WorkOrderStatusHistory {
+  id          String           @id @default(cuid())
+  workOrderId String
+  workOrder   WorkOrder        @relation(fields: [workOrderId], references: [id])
+  fromStatus  WorkOrderStatus?
+  toStatus    WorkOrderStatus
+  changedById String
+  changedAt   DateTime         @default(now())
+  note        String?
+
+  @@index([workOrderId, changedAt])
+}
+
+model Diagnosis {
+  id             String    @id @default(cuid())
+  workOrderId    String    @unique
+  workOrder      WorkOrder @relation(fields: [workOrderId], references: [id])
+  checklist      Json? // [{ system, item, checked }]
+  finding        String
+  rootCause      String
+  recommendation String?
+  createdAt      DateTime  @default(now())
+}
+
+model RepairResult {
+  id               String    @id @default(cuid())
+  workOrderId      String    @unique
+  workOrder        WorkOrder @relation(fields: [workOrderId], references: [id])
+  correctiveAction String
+  remark           String?
+  createdAt        DateTime  @default(now())
+}
+
+// ============ SPARE PART ============
+
+model Part {
+  id            String     @id @default(cuid())
+  partNumber    String     @unique // OEM part number
+  description   String
+  manufacturer  String?
+  altPartNumber String?
+  system        PartSystem @default(OTHERS)
+  unit          String     @default("PCS")
+  createdAt     DateTime   @default(now())
+  deletedAt     DateTime?
+
+  usages        PartUsage[]
+  compatibility PartCompatibility[]
+
+  @@index([system])
+}
+
+// Kompatibilitas part ke kategori atau unit tertentu.
+// Tidak ada stok, harga, atau supplier. Itu di luar scope.
+model PartCompatibility {
+  id          String             @id @default(cuid())
+  partId      String
+  part        Part               @relation(fields: [partId], references: [id])
+  category    EquipmentCategory?
+  equipmentId String?
+
+  @@unique([partId, category, equipmentId])
+}
+
+model PartUsage {
+  id          String    @id @default(cuid())
+  workOrderId String
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id])
+  partId      String
+  part        Part      @relation(fields: [partId], references: [id])
+  qty         Int
+  usedAt      DateTime  @default(now())
+  deletedAt   DateTime?
+
+  @@index([partId, usedAt])
+}
+
+// ============ PREVENTIVE MAINTENANCE ============
+
+model PmChecklistTemplate {
+  id        String            @id @default(cuid())
+  name      String
+  category  EquipmentCategory
+  pmTypeId  String
+  pmType    PmType            @relation(fields: [pmTypeId], references: [id])
+  items     PmChecklistItem[]
+  isActive  Boolean           @default(true)
+  deletedAt DateTime?
+
+  @@unique([category, pmTypeId])
+  @@index([deletedAt])
+}
+
+model PmChecklistItem {
+  id         String              @id @default(cuid())
+  templateId String
+  template   PmChecklistTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  label      String
+  sortOrder  Int                 @default(0)
+}
+
+model PmPlan {
+  id           String    @id @default(cuid())
+  equipmentId  String
+  equipment    Equipment @relation(fields: [equipmentId], references: [id])
+  pmTypeId     String
+  pmType       PmType    @relation(fields: [pmTypeId], references: [id])
+  basis        PmBasis
+  intervalHour Int? // dipakai jika basis HOUR_METER, contoh 250
+  intervalDays Int? // dipakai jika basis CALENDAR, contoh 90
+  lastDoneHour Int?
+  lastDoneDate DateTime?
+  nextDueHour  Int?
+  nextDueDate  DateTime?
+  status       PmStatus  @default(UPCOMING)
+  isActive     Boolean   @default(true)
+  deletedAt    DateTime?
+
+  workOrders WorkOrder[]
+  executions PmExecution[]
+
+  @@unique([equipmentId, pmTypeId])
+  @@index([status])
+  @@index([deletedAt])
+}
+
+model PmExecution {
+  id          String    @id @default(cuid())
+  workOrderId String    @unique
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id])
+  pmPlanId    String
+  pmPlan      PmPlan    @relation(fields: [pmPlanId], references: [id])
+  hourMeter   Int
+  results     Json // [{ itemId, label, checked, note }]
+  executedAt  DateTime  @default(now())
+}
+
+// ============ INSPECTION ============
+
+model Inspection {
+  id                String           @id @default(cuid())
+  code              String           @unique // INS-2026-000012
+  equipmentId       String
+  equipment         Equipment        @relation(fields: [equipmentId], references: [id])
+  inspectionTypeId  String
+  inspectionType    InspectionType   @relation(fields: [inspectionTypeId], references: [id])
+  inspectorId       String
+  inspector         User             @relation(fields: [inspectorId], references: [id])
+  inspectionDate    DateTime
+  hourMeter         Int
+  result            InspectionResult
+  finding           String?
+  recommendation    String?
+  certificateNumber String?
+  validUntil        DateTime?
+  createdAt         DateTime         @default(now())
+  deletedAt         DateTime?
+
+  @@index([equipmentId, inspectionDate])
+  @@index([validUntil])
+}
+
+// ============ SHARED ============
+
+model Attachment {
+  id           String           @id @default(cuid())
+  entityType   AttachmentEntity
+  entityId     String
+  kind         String           @default("PHOTO") // PHOTO | PHOTO_BEFORE | PHOTO_AFTER | DOCUMENT | CERTIFICATE
+  fileKey      String // key di MinIO
+  fileName     String
+  mimeType     String
+  sizeBytes    Int
+  uploadedById String
+  uploadedBy   User             @relation(fields: [uploadedById], references: [id])
+  createdAt    DateTime         @default(now())
+
+  @@index([entityType, entityId])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  at        DateTime @default(now())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String // LOGIN | LOGOUT | CREATE | UPDATE | DELETE | STATUS_CHANGE | VIEW | EXPORT
+  entity    String // Auth | Equipment | WorkOrder | Breakdown | HourMeter | PmPlan | Inspection | Part | User | MasterData
+  entityId  String?
+  field     String?
+  oldValue  String?
+  newValue  String?
+  reason    String? // Keterangan / alasan mengapa aksi dilakukan
+  details   String? // Deskripsi ringkas atau data pelengkap
+  ipAddress String?
+  userAgent String?
+
+  @@index([entity, entityId, at])
+  @@index([action, at])
+  @@index([userId, at])
+  @@index([at])
+}
+
+/// Pelacak percobaan login gagal untuk rate limiting.
+///
+/// Disimpan di DB (bukan memori proses) supaya tidak hilang saat container
+/// restart — penyerang tidak bisa mereset penghitung dengan memicu restart.
+///
+/// Dua cakupan dengan perlakuan berbeda, lihat @/lib/rate-limit:
+///   scope="ip"  → kunci keras; membatasi penebak dari satu sumber
+///   scope="nik" → throttle bertahap tanpa penguncian, supaya tidak ada
+///                 yang bisa mengunci akun orang lain dengan sengaja
+model LoginAttempt {
+  id             String    @id @default(cuid())
+  scope          String // "ip" | "nik"
+  key            String // IP klien, atau NIK yang dinormalisasi huruf besar
+  count          Int       @default(0)
+  firstAttemptAt DateTime  @default(now())
+  lastAttemptAt  DateTime  @default(now())
+  lockedUntil    DateTime?
+
+  @@unique([scope, key])
+  @@index([lastAttemptAt])
+}

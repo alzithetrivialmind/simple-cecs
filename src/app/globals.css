@@ -1,0 +1,138 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Cool grey surface; white panels on top */
+    --background: 215 8% 95%;
+    --foreground: 215 18% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 215 20% 14%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 20% 14%;
+
+    /* Navy: high contrast with white text */
+    --primary: 215 67% 23%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Amber accent */
+    --gold: 41 92% 52%;
+    --gold-foreground: 215 67% 20%;
+
+    --secondary: 215 25% 94%;
+    --secondary-foreground: 215 67% 23%;
+
+    --muted: 215 8% 93%;
+    --muted-foreground: 215 6% 36%;
+
+    --accent: 215 30% 93%;
+    --accent-foreground: 215 67% 23%;
+
+    --destructive: 0 84% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 215 8% 84%;
+    --input: 215 8% 78%;
+    --ring: 215 67% 23%;
+
+    --radius: 0.5rem;
+
+    /* Navy sidebar */
+    --sidebar-background: 215 67% 23%;
+    --sidebar-foreground: 215 20% 98%;
+    --sidebar-primary: 41 92% 52%;
+    --sidebar-primary-foreground: 215 67% 20%;
+    --sidebar-accent: 215 55% 30%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 215 50% 28%;
+    --sidebar-ring: 41 92% 52%;
+  }
+
+  .dark {
+    --background: 215 25% 9%;
+    --foreground: 215 20% 97%;
+
+    --card: 215 22% 13%;
+    --card-foreground: 215 20% 97%;
+
+    --popover: 215 22% 13%;
+    --popover-foreground: 215 20% 97%;
+
+    --primary: 215 55% 45%;
+    --primary-foreground: 215 25% 8%;
+
+    --gold: 41 92% 52%;
+    --gold-foreground: 215 67% 20%;
+
+    --secondary: 215 20% 18%;
+    --secondary-foreground: 215 20% 97%;
+
+    --muted: 215 20% 18%;
+    --muted-foreground: 215 12% 65%;
+
+    --accent: 215 20% 20%;
+    --accent-foreground: 215 20% 97%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 215 20% 22%;
+    --input: 215 20% 24%;
+    --ring: 215 55% 45%;
+
+    --sidebar-background: 215 30% 8%;
+    --sidebar-foreground: 215 20% 97%;
+    --sidebar-primary: 41 92% 52%;
+    --sidebar-primary-foreground: 215 67% 20%;
+    --sidebar-accent: 215 25% 15%;
+    --sidebar-accent-foreground: 215 20% 97%;
+    --sidebar-border: 215 20% 16%;
+    --sidebar-ring: 41 92% 52%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+/* Custom scrollbar for data tables and panels */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
+}
+
+/* Horizontal swipe rows (tab bars on mobile): keep scrolling, hide the bar */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(200%);
+  }
+}

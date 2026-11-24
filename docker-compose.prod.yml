@@ -1,0 +1,227 @@
+# =============================================
+# CECS - Production Stack
+# docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+# =============================================
+
+services:
+  # ---------- PostgreSQL 16 ----------
+  postgres:
+    image: postgres:16-alpine
+    container_name: cecs_postgres
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Jakarta
+      PGTZ: Asia/Jakarta
+      POSTGRES_DB: ${POSTGRES_DB:-cecs}
+      POSTGRES_USER: ${POSTGRES_USER:-cecs_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.production}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_READ_SEARCH
+      - FOWNER
+      - SETGID
+      - SETUID
+    mem_limit: 2g
+    pids_limit: 200
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cecs_user} -d ${POSTGRES_DB:-cecs}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cecs_internal
+
+  # ---------- MinIO (S3-compatible storage) ----------
+  minio:
+    image: minio/minio:latest
+    container_name: cecs_minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      TZ: Asia/Jakarta
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:?Set MINIO_ACCESS_KEY in .env.production}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:?Set MINIO_SECRET_KEY in .env.production}
+    ports:
+      - "127.0.0.1:9000:9000"   # S3 API - internal only
+      - "127.0.0.1:9001:9001"   # Admin console - internal only
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    mem_limit: 1g
+    pids_limit: 200
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    networks:
+      - cecs_internal
+
+  # ---------- Create default MinIO bucket ----------
+  createbuckets:
+    image: minio/mc:latest
+    container_name: cecs_createbuckets
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc alias set myminio http://minio:9000 $${MINIO_ACCESS_KEY} $${MINIO_SECRET_KEY};
+      /usr/bin/mc mb myminio/$${MINIO_BUCKET:-cecs-attachments} --ignore-existing;
+      /usr/bin/mc anonymous set none myminio/$${MINIO_BUCKET:-cecs-attachments};
+      exit 0;
+      "
+    environment:
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:?Set MINIO_ACCESS_KEY in .env.production}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?Set MINIO_SECRET_KEY in .env.production}
+      MINIO_BUCKET: ${MINIO_BUCKET:-cecs-attachments}
+    networks:
+      - cecs_internal
+
+  # ---------- CECS Next.js App ----------
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_ORG_NAME: ${NEXT_PUBLIC_ORG_NAME:-Your Company}
+    container_name: cecs_app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    # Published on loopback only, for a reverse proxy running on the host.
+    # Set APP_BIND=0.0.0.0 to reach port 3000 from the LAN without a proxy.
+    ports:
+      - "${APP_BIND:-127.0.0.1}:3000:3000"
+    environment:
+      TZ: Asia/Jakarta
+      NODE_ENV: production
+      PORT: 3000
+      # Database - uses internal Docker network name
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-cecs_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cecs}?schema=public"
+      # Auth
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?Set NEXTAUTH_SECRET in .env.production}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:?Set NEXTAUTH_URL in .env.production}
+      AUTH_URL: ${NEXTAUTH_URL:?Set NEXTAUTH_URL in .env.production}
+      NEXT_PUBLIC_APP_URL: ${NEXTAUTH_URL:?Set NEXTAUTH_URL in .env.production}
+      AUTH_TRUST_HOST: "true"
+      LAN_IP: ${LAN_IP:-}
+      # MinIO - uses internal Docker network name
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: "9000"
+      MINIO_USE_SSL: "false"
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:?Set MINIO_ACCESS_KEY in .env.production}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?Set MINIO_SECRET_KEY in .env.production}
+      MINIO_BUCKET: ${MINIO_BUCKET:-cecs-attachments}
+      # Pembatasan IP untuk ADMIN & SUPERVISOR.
+      # Kosong = fitur nonaktif. Lihat docs/IP-RESTRICTION.md
+      ADMIN_IP_ALLOWLIST: ${ADMIN_IP_ALLOWLIST:-}
+      # Cron
+      CRON_SECRET: ${CRON_SECRET:?Set CRON_SECRET in .env.production}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    mem_limit: 2g
+    pids_limit: 300
+    # Filesystem read-only. MinIO adalah penyimpanan utama; direktori di
+    # bawah ini satu-satunya yang perlu ditulis saat runtime.
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/.next/cache
+      - /app/public/uploads
+    networks:
+      - cecs_internal
+
+  # ---------- Nginx Reverse Proxy ----------
+  # Only runs with --profile proxy, so it does not clash with a reverse
+  # proxy that already holds ports 80/443 on the host.
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: cecs_nginx
+    restart: unless-stopped
+    profiles: ["proxy"]
+    depends_on:
+      - app
+    # Bind address dikontrol lewat .env.production supaya cutover ke
+    # Cloudflare Tunnel tidak perlu mengedit file ini:
+    #   HTTP_BIND=0.0.0.0    → port terbuka di LAN/WAN (mode port-forward)
+    #   HTTP_BIND=127.0.0.1  → hanya cloudflared yang bisa menjangkau
+    ports:
+      - "${HTTP_BIND:-0.0.0.0}:80:80"
+      - "${HTTPS_BIND:-0.0.0.0}:443:443"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+      - NET_BIND_SERVICE   # perlu untuk bind port 80/443
+    mem_limit: 256m
+    pids_limit: 200
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro          # mount TLS certs here
+      - nginx_logs:/var/log/nginx
+    networks:
+      - cecs_internal
+
+  # ---------- Cloudflare Tunnel (opsional, direkomendasikan) ----------
+  # Membuat koneksi KELUAR ke Cloudflare, sehingga tidak ada satu pun port
+  # masuk yang perlu di-forward di router. Lihat docs/CLOUDFLARE-TUNNEL.md untuk langkah setup.
+  #
+  # Jalankan dengan:
+  #   docker compose -f docker-compose.prod.yml --env-file .env.production \
+  #     --profile tunnel up -d
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cecs_tunnel
+    restart: unless-stopped
+    profiles: ["tunnel"]
+    # Sengaja tanpa depends_on: nginx berada di profile lain, dan menautkan
+    # keduanya membuat profile "tunnel" gagal naik sendirian.
+    command: tunnel --no-autoupdate run
+    environment:
+      TZ: Asia/Jakarta
+      # Memakai :- bukan :? — Compose menginterpolasi SELURUH berkas sebelum
+      # menyaring profile, sehingga :? tetap dievaluasi dan menggagalkan
+      # `up` biasa walaupun service ini tidak diaktifkan.
+      # cloudflared sendiri akan menolak jalan bila token kosong.
+      TUNNEL_TOKEN: ${CF_TUNNEL_TOKEN:-}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    networks:
+      - cecs_internal
+
+volumes:
+  postgres_data:
+    name: cecs_prod_postgres_data
+  minio_data:
+    name: cecs_prod_minio_data
+  nginx_logs:
+    name: cecs_prod_nginx_logs
+
+networks:
+  cecs_internal:
+    name: cecs_internal
+    driver: bridge
+
