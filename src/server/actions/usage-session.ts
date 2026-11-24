@@ -3,6 +3,7 @@
 import { db } from "@/lib/db";
 import { toUserMessage } from "@/lib/errors";
 import { requireAuth, requireRole } from "@/lib/auth-guard";
+import { INPUT_ROLES } from "@/lib/roles";
 import { createAuditLog } from "@/lib/audit";
 import {
   startUsageSessionSchema,
@@ -16,7 +17,7 @@ import { syncEquipmentStatus } from "@/server/services/equipment-status";
 import { recalcAllPmPlans } from "@/server/services/pm-status";
 
 export async function startEquipmentUsage(data: StartUsageSessionInput) {
-  const user = await requireAuth();
+  const user = await requireRole(INPUT_ROLES);
 
   const validation = startUsageSessionSchema.safeParse(data);
   if (!validation.success) {
@@ -196,7 +197,7 @@ export async function startEquipmentUsage(data: StartUsageSessionInput) {
 }
 
 export async function finishEquipmentUsage(data: FinishUsageSessionInput) {
-  const user = await requireAuth();
+  const user = await requireRole(INPUT_ROLES);
 
   const validation = finishUsageSessionSchema.safeParse(data);
   if (!validation.success) {

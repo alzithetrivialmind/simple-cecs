@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { canInputData } from "@/lib/roles";
 import { useSearchParams } from "next/navigation";
 import {
   ClipboardCheck,
@@ -63,11 +64,13 @@ interface InspectionItem {
 interface InspectionListClientProps {
   inspections: InspectionItem[];
   inspectionTypes: { id: string; name: string }[];
+  userRole?: string;
 }
 
 export function InspectionListClient({
   inspections,
   inspectionTypes,
+  userRole,
 }: InspectionListClientProps) {
   const searchParams = useSearchParams();
 
@@ -204,12 +207,14 @@ export function InspectionListClient({
           </div>
         </div>
 
-        <Button asChild className="shrink-0 gap-2">
-          <Link href="/inspection/new">
-            <Plus className="w-4 h-4" />
-            Input Inspeksi Baru
-          </Link>
-        </Button>
+        {canInputData(userRole) && (
+          <Button asChild className="shrink-0 gap-2">
+            <Link href="/inspection/new">
+              <Plus className="w-4 h-4" />
+              Input Inspeksi Baru
+            </Link>
+          </Button>
+        )}
       </div>
 
       {/* Stats Summary Cards */}
@@ -249,12 +254,14 @@ export function InspectionListClient({
                 ? "Tidak ada hasil yang cocok dengan filter yang dipilih."
                 : "Belum ada catatan inspeksi unit yang tersimpan di sistem."}
             </p>
-            <Button asChild variant="outline" className="gap-2 mt-2">
-              <Link href="/inspection/new">
-                <Plus className="w-4 h-4" />
-                Catat Inspeksi Pertama
-              </Link>
-            </Button>
+            {canInputData(userRole) && (
+              <Button asChild variant="outline" className="gap-2 mt-2">
+                <Link href="/inspection/new">
+                  <Plus className="w-4 h-4" />
+                  Catat Inspeksi Pertama
+                </Link>
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (

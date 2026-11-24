@@ -3,6 +3,7 @@
 import { db } from "@/lib/db";
 import { toUserMessage } from "@/lib/errors";
 import { requireAuth, requireRole } from "@/lib/auth-guard";
+import { INPUT_ROLES } from "@/lib/roles";
 import { generateBreakdownCode, generateWorkOrderCode } from "@/lib/numbering";
 import { syncEquipmentStatus } from "@/server/services/equipment-status";
 import { createAuditLog } from "@/lib/audit";
@@ -19,7 +20,7 @@ import {
 import { revalidatePath } from "next/cache";
 
 export async function createBreakdownRequest(data: BreakdownRequestInput) {
-  const user = await requireAuth();
+  const user = await requireRole(INPUT_ROLES);
 
   const validation = breakdownRequestSchema.safeParse(data);
   if (!validation.success) {

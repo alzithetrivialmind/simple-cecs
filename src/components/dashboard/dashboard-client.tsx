@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { canInputData } from "@/lib/roles";
 import { AlertTriangle, ChevronRight, ClipboardCheck, Gauge } from "lucide-react";
 import { EquipmentCategory } from "@prisma/client";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,7 @@ type DashboardPayload = Awaited<ReturnType<typeof getDashboardData>>;
 
 interface DashboardClientProps {
   data: DashboardPayload;
+  userRole?: string;
 }
 
 const nf = new Intl.NumberFormat("id-ID");
@@ -25,7 +27,7 @@ const todayFmt = new Intl.DateTimeFormat("id-ID", {
   year: "numeric",
 });
 
-export function DashboardClient({ data }: DashboardClientProps) {
+export function DashboardClient({ data, userRole }: DashboardClientProps) {
   const { metrics } = data;
   const downUnits = metrics.breakdownUnits + metrics.underRepairUnits;
   const waitingPart = data.openWorkOrders.filter((wo) => wo.status === "WAITING_PART");
@@ -38,26 +40,28 @@ export function DashboardClient({ data }: DashboardClientProps) {
           <h1 className="font-condensed text-3xl font-bold leading-none tracking-tight">Dashboard</h1>
           <p className="mt-1 text-sm text-muted-foreground">{todayFmt.format(new Date())}</p>
         </div>
-        <div className="grid grid-cols-2 gap-2 sm:flex">
-          <Button asChild className="col-span-2 h-12 bg-red-600 text-base hover:bg-red-700 sm:h-10 sm:text-sm">
-            <Link href="/breakdown/new">
-              <AlertTriangle className="h-5 w-5 sm:h-4 sm:w-4" />
-              Lapor kerusakan
-            </Link>
-          </Button>
-          <Button asChild variant="outline" className="h-11 sm:h-10">
-            <Link href="/hour-meter/new">
-              <Gauge className="h-4 w-4" />
-              Hour meter
-            </Link>
-          </Button>
-          <Button asChild variant="outline" className="h-11 sm:h-10">
-            <Link href="/inspection/new">
-              <ClipboardCheck className="h-4 w-4" />
-              Inspeksi
-            </Link>
-          </Button>
-        </div>
+        {canInputData(userRole) && (
+          <div className="grid grid-cols-2 gap-2 sm:flex">
+            <Button asChild className="col-span-2 h-12 bg-red-600 text-base hover:bg-red-700 sm:h-10 sm:text-sm">
+              <Link href="/breakdown/new">
+                <AlertTriangle className="h-5 w-5 sm:h-4 sm:w-4" />
+                Lapor kerusakan
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="h-11 sm:h-10">
+              <Link href="/hour-meter/new">
+                <Gauge className="h-4 w-4" />
+                Hour meter
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="h-11 sm:h-10">
+              <Link href="/inspection/new">
+                <ClipboardCheck className="h-4 w-4" />
+                Inspeksi
+              </Link>
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* KPI: angka besar, bisa diketuk ke daftar terfilter */}

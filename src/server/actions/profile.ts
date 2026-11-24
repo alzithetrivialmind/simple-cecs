@@ -1,7 +1,8 @@
 "use server";
 
 import { db } from "@/lib/db";
-import { requireAuth } from "@/lib/auth-guard";
+import { requireAuth, requireRole } from "@/lib/auth-guard";
+import { INPUT_ROLES } from "@/lib/roles";
 import { createAuditLog } from "@/lib/audit";
 import bcrypt from "bcryptjs";
 import { validatePasswordStrength } from "@/lib/validations/password";
@@ -120,7 +121,7 @@ export async function changePassword(data: {
  * Update equipment photo (can be called from Equipment Detail)
  */
 export async function updateEquipmentPhoto(equipmentId: string, photoUrl: string) {
-  const user = await requireAuth();
+  const user = await requireRole(INPUT_ROLES);
 
   const existing = await db.equipment.findUnique({
     where: { id: equipmentId },

@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { canInputData } from "@/lib/roles";
 import { useRouter } from "next/navigation";
 import {
   EquipmentCategory,
@@ -875,12 +876,14 @@ export function EquipmentDetailClient({
             <h3 className="text-sm font-semibold">
               Riwayat Pembacaan Jam Operasi (10 Terakhir)
             </h3>
-            <Link href={`/hour-meter/new?equipmentId=${equipment.id}`}>
-              <Button size="sm" className="gap-1.5 h-9">
-                <PlusCircle className="h-4 w-4" />
-                Input Hour Meter Baru
-              </Button>
-            </Link>
+            {canInputData(userRole) && (
+              <Link href={`/hour-meter/new?equipmentId=${equipment.id}`}>
+                <Button size="sm" className="gap-1.5 h-9">
+                  <PlusCircle className="h-4 w-4" />
+                  Input Hour Meter Baru
+                </Button>
+              </Link>
+            )}
           </div>
 
           <Card>
@@ -946,20 +949,22 @@ export function EquipmentDetailClient({
             <h3 className="text-sm font-semibold">
               Riwayat Perbaikan & Perintah Kerja ({equipment.workOrders?.length || 0})
             </h3>
-            <div className="flex items-center gap-2">
-              <Link href={`/breakdown/new?equipmentId=${equipment.id}`}>
-                <Button size="sm" variant="destructive" className="gap-1.5 h-9">
-                  <AlertTriangle className="h-4 w-4" />
-                  Lapor Kerusakan
-                </Button>
-              </Link>
-              <Link href={`/work-order/new?equipmentId=${equipment.id}`}>
-                <Button size="sm" className="gap-1.5 h-9">
-                  <PlusCircle className="h-4 w-4" />
-                  Buat WO
-                </Button>
-              </Link>
-            </div>
+            {canInputData(userRole) && (
+              <div className="flex items-center gap-2">
+                <Link href={`/breakdown/new?equipmentId=${equipment.id}`}>
+                  <Button size="sm" variant="destructive" className="gap-1.5 h-9">
+                    <AlertTriangle className="h-4 w-4" />
+                    Lapor Kerusakan
+                  </Button>
+                </Link>
+                <Link href={`/work-order/new?equipmentId=${equipment.id}`}>
+                  <Button size="sm" className="gap-1.5 h-9">
+                    <PlusCircle className="h-4 w-4" />
+                    Buat WO
+                  </Button>
+                </Link>
+              </div>
+            )}
           </div>
 
           <Card>

@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
-import { auth } from "@/auth";
+import { requireRolePage } from "@/lib/auth-guard";
+import { INPUT_ROLES } from "@/lib/roles";
 import { InspectionForm } from "@/components/inspection/inspection-form";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
@@ -15,8 +16,8 @@ interface NewInspectionPageProps {
 export default async function NewInspectionPage({
   searchParams,
 }: NewInspectionPageProps) {
+  const user = await requireRolePage(INPUT_ROLES);
   const sp = await searchParams;
-  const session = await auth();
 
   const [equipments, inspectionTypes, inspectors] = await Promise.all([
     db.equipment.findMany({
@@ -64,7 +65,7 @@ export default async function NewInspectionPage({
         equipments={equipments}
         inspectionTypes={inspectionTypes}
         inspectors={inspectors}
-        currentUserId={session?.user?.id || ""}
+        currentUserId={user.id}
         defaultEquipmentId={sp.equipmentId}
       />
     </div>

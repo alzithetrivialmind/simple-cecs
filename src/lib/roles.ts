@@ -20,6 +20,22 @@ export const REPORT_ROLES = ["ADMIN", "SUPERVISOR"] as const satisfies readonly 
 export const ADMIN_ROLES = ["ADMIN"] as const satisfies readonly Role[];
 
 /**
+ * Roles that may enter operational data (breakdowns, inspections, usage, parts).
+ * VIEWER is left out on purpose: it is read-only.
+ */
+export const INPUT_ROLES = [
+  "ADMIN",
+  "SUPERVISOR",
+  "TECHNICIAN",
+  "OPERATOR",
+] as const satisfies readonly Role[];
+
+/** Whether this role may enter operational data. Also used to hide input buttons. */
+export function canInputData(role?: string | null): boolean {
+  return !!role && (INPUT_ROLES as readonly string[]).includes(role);
+}
+
+/**
  * Peran yang hanya boleh dipakai dari jaringan kantor (lihat @/lib/ip-allowlist).
  *
  * Sengaja didefinisikan terpisah dari REPORT_ROLES meskipun isinya kebetulan

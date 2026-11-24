@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { canInputData } from "@/lib/roles";
 import {
   WorkOrderStatus,
   WorkOrderType,
@@ -164,9 +165,11 @@ export function WorkOrderListClient({
         <p className="mt-1 text-sm text-muted-foreground">
           Work order korektif dibuat otomatis saat kerusakan dilaporkan.
         </p>
-        <Button asChild className="mt-4 bg-red-600 hover:bg-red-700">
-          <Link href="/breakdown/new">Lapor kerusakan</Link>
-        </Button>
+        {canInputData(userRole) && (
+          <Button asChild className="mt-4 bg-red-600 hover:bg-red-700">
+            <Link href="/breakdown/new">Lapor kerusakan</Link>
+          </Button>
+        )}
       </div>
     ) : (
       <div className="px-4 py-12 text-center">

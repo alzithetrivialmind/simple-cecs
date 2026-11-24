@@ -3,6 +3,7 @@
 import { db } from "@/lib/db";
 import { toUserMessage } from "@/lib/errors";
 import { requireAuth, requireRole } from "@/lib/auth-guard";
+import { INPUT_ROLES } from "@/lib/roles";
 import { createAuditLog } from "@/lib/audit";
 import { rankTopUnits } from "@/server/services/part-usage";
 import {
@@ -288,7 +289,7 @@ export async function deletePart(id: string) {
 }
 
 export async function recordPartUsage(data: RecordPartUsageInput) {
-  await requireAuth();
+  await requireRole(INPUT_ROLES);
 
   const validation = recordPartUsageSchema.safeParse(data);
   if (!validation.success) {

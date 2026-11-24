@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Role } from "@prisma/client";
-import { canAccessReports } from "@/lib/roles";
+import { canAccessReports, canInputData } from "@/lib/roles";
 import { logoutAction } from "@/server/actions/auth";
 
 interface BottomNavProps {
@@ -193,12 +193,14 @@ export function BottomNav({ userRole }: BottomNavProps) {
               <SheetTitle className="font-condensed text-2xl font-bold">Menu</SheetTitle>
             </SheetHeader>
 
-            <Button asChild className="h-12 w-full bg-red-600 text-base hover:bg-red-700">
-              <Link href="/breakdown/new" onClick={() => setOpenDrawer(false)}>
-                <PlusCircle className="h-5 w-5" />
-                Lapor kerusakan
-              </Link>
-            </Button>
+            {canInputData(userRole) && (
+              <Button asChild className="h-12 w-full bg-red-600 text-base hover:bg-red-700">
+                <Link href="/breakdown/new" onClick={() => setOpenDrawer(false)}>
+                  <PlusCircle className="h-5 w-5" />
+                  Lapor kerusakan
+                </Link>
+              </Button>
+            )}
 
             <ul className="mt-3 divide-y rounded-lg border">
               {menuDrawerItems.map((item) => {

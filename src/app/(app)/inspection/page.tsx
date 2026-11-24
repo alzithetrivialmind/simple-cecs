@@ -16,7 +16,7 @@ interface InspectionPageProps {
 }
 
 export default async function InspectionPage({ searchParams }: InspectionPageProps) {
-  await requireAuthPage();
+  const user = await requireAuthPage();
   const sp = await searchParams;
   const validResult = Object.values(InspectionResult).includes(sp.result as InspectionResult)
     ? (sp.result as InspectionResult)
@@ -43,6 +43,7 @@ export default async function InspectionPage({ searchParams }: InspectionPagePro
       <InspectionListClient
         inspections={inspections}
         inspectionTypes={inspectionTypes}
+        userRole={user.role}
       />
     </div>
   );

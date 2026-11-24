@@ -3,6 +3,7 @@
 import { db } from "@/lib/db";
 import { toUserMessage } from "@/lib/errors";
 import { requireAuth, requireRole } from "@/lib/auth-guard";
+import { INPUT_ROLES } from "@/lib/roles";
 import {
   generateInspectionCode,
   generateBreakdownCode,
@@ -127,7 +128,7 @@ export async function getInspectionById(id: string) {
 }
 
 export async function createInspection(data: InspectionInput) {
-  const user = await requireAuth();
+  const user = await requireRole(INPUT_ROLES);
 
   const validation = inspectionSchema.safeParse(data);
   if (!validation.success) {

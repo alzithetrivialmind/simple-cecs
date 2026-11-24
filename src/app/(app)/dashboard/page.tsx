@@ -7,9 +7,9 @@ export const dynamic = "force-dynamic";
 export default async function DashboardPage() {
   // Page-safe: redirect ke /login jika sesi tidak ada,
   // alih-alih throw "Application error"
-  await requireAuthPage();
+  const user = await requireAuthPage();
 
   const data = await getDashboardData();
-  return <DashboardClient data={data} />;
+  return <DashboardClient data={data} userRole={user.role} />;
 }
 

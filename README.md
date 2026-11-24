@@ -30,7 +30,7 @@ CECS deliberately does **not** handle costs, purchasing, vendors, or stock level
 | `SUPERVISOR` | Manage equipment, work orders, schedules, and reports |
 | `TECHNICIAN` | Report breakdowns, carry out work orders and maintenance, record hour meters and inspections |
 | `OPERATOR` | Record equipment usage and report problems from the field |
-| `VIEWER` | Meant for viewing, with no access to reports. Not yet strictly read-only: the server still accepts breakdown, inspection, and usage entries from this role |
+| `VIEWER` | Read only, without reports |
 
 ## Tech stack
 

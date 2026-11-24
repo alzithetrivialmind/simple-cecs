@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
-import { requireAuthPage } from "@/lib/auth-guard";
+import { requireRolePage } from "@/lib/auth-guard";
+import { INPUT_ROLES } from "@/lib/roles";
 import { BreakdownForm } from "@/components/breakdown/breakdown-form";
 
 export const metadata = {
@@ -13,7 +14,7 @@ interface NewBreakdownPageProps {
 export default async function NewBreakdownPage({
   searchParams,
 }: NewBreakdownPageProps) {
-  await requireAuthPage();
+  await requireRolePage(INPUT_ROLES);
   const { equipmentId } = await searchParams;
 
   const equipments = await db.equipment.findMany({

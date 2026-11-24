@@ -1,6 +1,7 @@
 "use server";
 
 import { requireAuth } from "@/lib/auth-guard";
+import { canInputData } from "@/lib/roles";
 import { toUserMessage } from "@/lib/errors";
 import { uploadBuffer } from "@/lib/storage";
 import { promises as fs } from "fs";
@@ -55,6 +56,18 @@ async function mirrorLocally(
 }
 
 /**
+ * Every role may upload its own profile photo; all other uploads need an input role.
+ */
+async function requireUploadAccess(folder: string): Promise<void> {
+  const user = await requireAuth();
+  if (folder !== "avatars" && !canInputData(user.role)) {
+    throw new Error(
+      `FORBIDDEN: Peran ${user.role} tidak memiliki izin untuk melakukan aksi ini.`
+    );
+  }
+}
+
+/**
  * Upload image from base64 data URL (e.g. from camera capture)
  */
 export async function uploadBase64Image(
@@ -62,7 +75,7 @@ export async function uploadBase64Image(
   folder = "general"
 ): Promise<UploadResult> {
   try {
-    await requireAuth();
+    await requireUploadAccess(folder);
 
     const matches = dataUrl.match(/^data:([A-Za-z0-9-+\/.]+);base64,(.+)$/);
     if (!matches || matches.length !== 3) {
@@ -107,7 +120,7 @@ export async function uploadFormData(
   folder = "general"
 ): Promise<UploadResult> {
   try {
-    await requireAuth();
+    await requireUploadAccess(folder);
 
     const file = formData.get("file") as File | null;
     if (!file) {
